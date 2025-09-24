@@ -170,5 +170,3 @@ Coder implements these SCIM 2.0 endpoints:
 - [Okta SCIM Documentation](https://developer.okta.com/docs/reference/scim/)
 
 ---
-
-*Generated from Slack thread discussion between Matyas and Blink*
