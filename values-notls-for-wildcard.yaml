@@ -1,0 +1,149 @@
+coder:
+  # Environment variables for Coder configuration
+  env:
+    # Access URL for your Coder deployment
+    - name: "CODER_ACCESS_URL"
+      value: "https://coder.example.com"
+    - name: "CODER_WILDCARD_ACCESS_URL"
+      value: "*.coder.example.com"
+    
+    # Provisioner configuration - 8 threads for workspace builds
+    - name: "CODER_PROVISIONER_DAEMONS"
+      value: "8"
+    
+    # Enable local user creation (password-based authentication)
+    - name: "CODER_DISABLE_PASSWORD_AUTH"
+      value: "false"
+    
+    # PostgreSQL database configuration (recommended for production)
+    - name: "CODER_PG_CONNECTION_URL"
+      valueFrom:
+        secretKeyRef:
+          name: coder-db-secret
+          key: connection-url
+    
+    # ForgeRock OIDC configuration
+    - name: "CODER_OIDC_ISSUER_URL"
+      value: "https://your-forgerock.example.com/oauth2"
+    - name: "CODER_OIDC_EMAIL_DOMAIN"
+      value: "example.com"
+    - name: "CODER_OIDC_CLIENT_ID"
+      valueFrom:
+        secretKeyRef:
+          name: coder-oidc-secret
+          key: client-id
+    - name: "CODER_OIDC_CLIENT_SECRET"
+      valueFrom:
+        secretKeyRef:
+          name: coder-oidc-secret
+          key: client-secret
+    - name: "CODER_OIDC_SCOPES"
+      value: "openid,profile,email"
+    - name: "CODER_OIDC_USERNAME_FIELD"
+      value: "preferred_username"
+    - name: "CODER_OIDC_EMAIL_FIELD"
+      value: "email"
+    - name: "CODER_OIDC_ALLOW_SIGNUPS"
+      value: "true"
+    
+    # GitHub external authentication
+    - name: "CODER_EXTERNAL_AUTH_0_ID"
+      value: "github"
+    - name: "CODER_EXTERNAL_AUTH_0_TYPE"
+      value: "github"
+    - name: "CODER_EXTERNAL_AUTH_0_CLIENT_ID"
+      valueFrom:
+        secretKeyRef:
+          name: coder-github-secret
+          key: client-id
+    - name: "CODER_EXTERNAL_AUTH_0_CLIENT_SECRET"
+      valueFrom:
+        secretKeyRef:
+          name: coder-github-secret
+          key: client-secret
+    
+    # Enable Prometheus metrics
+    - name: "CODER_PROMETHEUS_ENABLE"
+      value: "true"
+    
+    # Optional: Enable verbose logging for troubleshooting
+    - name: "CODER_VERBOSE"
+      value: "true"
+
+  # Resource configuration - 2 CPU and 8GB RAM as requested
+  resources:
+    limits:
+      cpu: "2"
+      memory: "8Gi"
+    requests:
+      cpu: "2"
+      memory: "8Gi"
+
+  # Node selector for EKS node groups
+  nodeSelector:
+    kubernetes.io/arch: amd64
+
+  # ServiceAccount permissions for workspace management
+  serviceAccount:
+    workspacePerms: true
+    enableDeployments: true
+    annotations:
+      # Optional: IRSA for AWS resources access
+      # eks.amazonaws.com/role-arn: "arn:aws:iam::account:role/coder-service-role"
+
+  # High availability (Enterprise feature)
+  replicaCount: 2
+
+  # Service configuration - ClusterIP for ALB Ingress
+  service:
+    enable: true
+    type: ClusterIP
+    sessionAffinity: None
+
+  # Ingress configuration for ALB with TLS only on main domain
+  ingress:
+    enable: true
+    className: "alb"
+    host: "coder.example.com"
+    wildcardHost: "*.coder.example.com"
+    annotations:
+      # ALB Ingress Controller annotations
+      kubernetes.io/ingress.class: alb
+      alb.ingress.kubernetes.io/scheme: internet-facing
+      alb.ingress.kubernetes.io/target-type: ip
+      alb.ingress.kubernetes.io/certificate-arn: "arn:aws:acm:us-west-2:123456789012:certificate/your-cert-id"
+      alb.ingress.kubernetes.io/ssl-redirect: "443"
+      alb.ingress.kubernetes.io/listen-ports: '[{"HTTP": 80}, {"HTTPS": 443}]'
+      # Health check configuration
+      alb.ingress.kubernetes.io/healthcheck-path: "/healthz"
+      alb.ingress.kubernetes.io/healthcheck-interval-seconds: "30"
+      alb.ingress.kubernetes.io/healthcheck-timeout-seconds: "5"
+      alb.ingress.kubernetes.io/healthy-threshold-count: "2"
+      alb.ingress.kubernetes.io/unhealthy-threshold-count: "3"
+      # ALB performance settings
+      alb.ingress.kubernetes.io/load-balancer-attributes: |
+        idle_timeout.timeout_seconds=300,
+        routing.http2.enabled=true,
+        access_logs.s3.enabled=false
+      # Optional: WAF integration
+      # alb.ingress.kubernetes.io/wafv2-acl-arn: "arn:aws:wafv2:us-west-2:123456789012:regional/webacl/your-waf/your-waf-id"
+    tls:
+      enable: true
+      # Note: TLS termination handled by ALB with ACM certificate
+      # Certificate only applies to coder.example.com (main host)
+      # Wildcard subdomains (*.coder.example.com) will not use TLS
+
+  # Affinity rules for multi-AZ deployment
+  affinity:
+    podAntiAffinity:
+      requiredDuringSchedulingIgnoredDuringExecution:
+        - labelSelector:
+            matchExpressions:
+              - key: app.kubernetes.io/name
+                operator: In
+                values:
+                  - coder
+          topologyKey: topology.kubernetes.io/zone
+
+  # Tolerations if using dedicated nodes
+  tolerations: []
