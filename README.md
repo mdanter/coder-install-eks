@@ -157,20 +157,9 @@ kubectl logs -n coder -l app.kubernetes.io/name=coder -f
 
 ### Deploy the Template
 1. **Login to Coder** as an admin
-2. **Go to Templates** → Create Template
-3. **Upload `universal-workspace-template.tf`**
-4. **Configure parameters**:
-   - CPU: 1-16 cores
-   - Memory: 2-64 GB
-   - Storage: 10-1000 GB
-   - Image: Select from available options
-
-### Template Features
-- **VS Code**: Access at `https://*.your-domain.com` (workspace URL)
-- **JupyterLab**: Available on port 8888
-- **GitHub Integration**: Automatic Git configuration
-- **Docker Support**: Container runtime included
-- **Resource Monitoring**: CPU, memory, and disk usage
+1. **Clone the Coder Registry repo:** `git clone https://github.com/coder/registry.git`
+2. **Switch to the template directory:** `cd registry/registry/coder/templates/kubernetes`
+3. **Push the contents of the template to your deployment:** `coder template push kubernetes -d .`
 
 ## 📊 Monitoring & Metrics
 
