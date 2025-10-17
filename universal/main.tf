@@ -131,6 +131,9 @@ resource "coder_agent" "main" {
 
     # Install pnpm for Node.js package management
     npm install -g pnpm
+    
+    pnpm setup
+    source /home/coder/.bashrc
 
     # Install Angular CLI
     pnpm add -g @angular/cli
@@ -147,10 +150,10 @@ resource "coder_agent" "main" {
     uv pip install fastapi uvicorn[standard] psycopg2-binary cassandra-driver
 
     # Start code-server
-    /home/coder/.local/bin/code-server --auth none --port 13337 >/tmp/code-server.log 2>&1 &
+    # /home/coder/.local/bin/code-server --auth none --port 13337 >/tmp/code-server.log 2>&1 &
 
     # Start JupyterLab
-    jupyter lab --ip=0.0.0.0 --port=8888 --no-browser --allow-root --NotebookApp.token='' --NotebookApp.password='' >/tmp/jupyter.log 2>&1 &
+    # jupyter lab --ip=0.0.0.0 --port=8888 --no-browser --allow-root --NotebookApp.token='' --NotebookApp.password='' >/tmp/jupyter.log 2>&1 &
   EOT
 
   metadata {
@@ -178,37 +181,32 @@ resource "coder_agent" "main" {
   }
 }
 
-resource "coder_app" "code-server" {
-  agent_id     = coder_agent.main.id
-  slug         = "code-server"
-  display_name = "VS Code Web"
-  url          = "http://localhost:13337/?folder=/home/coder"
-  icon         = "/icon/code.svg"
-  subdomain    = false
-  share        = "owner"
-
-  healthcheck {
-    url       = "http://localhost:13337/healthz"
-    interval  = 5
-    threshold = 6
-  }
+module "jetbrains" {
+  count    = data.coder_workspace.me.start_count
+  source   = "registry.coder.com/coder/jetbrains/coder"
+  version  = "1.1.0"
+  agent_id = coder_agent.main.id
+  folder   = "/home/coder/project"
+  default  = ["PY", "IU"] # Pre-configure GoLand and IntelliJ IDEA
 }
 
-resource "coder_app" "jupyterlab" {
-  agent_id     = coder_agent.main.id
-  slug         = "jupyterlab"
-  display_name = "JupyterLab"
-  url          = "http://localhost:8888"
-  icon         = "/icon/jupyter.svg"
-  subdomain    = true
-  share        = "owner"
-
-  healthcheck {
-    url       = "http://localhost:8888/api"
-    interval  = 5
-    threshold = 6
-  }
+module "vscode-web" {
+  count          = data.coder_workspace.me.start_count
+  source         = "registry.coder.com/coder/vscode-web/coder"
+  version        = "1.4.1"
+  agent_id       = coder_agent.main.id
+  extensions     = ["github.copilot", "ms-python.python", "ms-toolsai.jupyter"]
+  accept_license = true
 }
+
+module "jupyterlab" {
+  count    = data.coder_workspace.me.start_count
+  source   = "registry.coder.com/coder/jupyterlab/coder"
+  version  = "1.2.0"
+  agent_id = coder_agent.main.id
+}
+
+
 
 resource "kubernetes_persistent_volume_claim" "home" {
   metadata {
