@@ -22,3 +22,14 @@ A production-ready Coder template providing a comprehensive development environm
 - **Health Monitoring**: Real-time Docker status in UI
 - **Multi-OS Support**: Works on AL2023, Bottlerocket, and Ubuntu nodes
 - **Persistent Shell Config**: NVM and Python venv auto-activate
+
+##For Bottlerocket
+
+Bottlerocket: "cannot clone: Invalid argument"
+User namespaces not enabled. Add to user data:
+```
+[
+settings.kernel.sysctl
+]
+"user.max_user_namespaces" = "65536"
+```
