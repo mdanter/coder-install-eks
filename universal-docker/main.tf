@@ -125,44 +125,100 @@ data "coder_workspace_owner" "me" {}
 resource "coder_agent" "main" {
   arch = "amd64"
   os   = "linux"
+  
   startup_script = <<-EOT
+    #!/bin/bash
     set -e
 
-    # Install Java (OpenJDK 17)
-    sudo apt-get update
-    sudo apt-get install -y openjdk-17-jdk maven gradle
-    export JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64
-    export PATH="$JAVA_HOME/bin:$PATH"
+    # Only run installations once - creates ~/.setup_complete marker
+    if [ ! -f ~/.setup_complete ]; then
+      echo "🚀 First-time setup - installing development tools..."
+      
+      # Install Java (OpenJDK 17)
+      sudo apt-get update
+      sudo apt-get install -y openjdk-17-jdk maven gradle
+      export JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64
+      export PATH="$JAVA_HOME/bin:$PATH"
 
-    # Install Node.js (via nvm for version management)
-    curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.0/install.sh | bash
-    export NVM_DIR="$HOME/.nvm"
-    [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
-    nvm install --lts
-    nvm use --lts
+      # Install Node.js (via nvm for version management)
+      if [ ! -d "$HOME/.nvm" ]; then
+        curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.0/install.sh | bash
+      fi
+      export NVM_DIR="$HOME/.nvm"
+      [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
+      
+      # Add NVM to bashrc if not already there
+      if ! grep -q "NVM_DIR" ~/.bashrc; then
+        echo 'export NVM_DIR="$HOME/.nvm"' >> ~/.bashrc
+        echo '[ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"' >> ~/.bashrc
+      fi
+      
+      nvm install --lts
+      nvm use --lts
 
-    # Install pnpm for Node.js package management
-    npm install -g pnpm
-    
-    pnpm setup
-    source /home/coder/.bashrc
+      # Install pnpm for Node.js package management
+      npm install -g pnpm
+      
+      pnpm setup
+      source /home/coder/.bashrc
 
-    # Install Angular CLI
-    pnpm add -g @angular/cli
+      # Install Angular CLI
+      pnpm add -g @angular/cli
 
-    # Install uv for Python package management
-    curl -LsSf https://astral.sh/uv/install.sh | sh
-    export PATH="$HOME/.local/bin:$PATH"
+      # Install uv for Python package management
+      curl -LsSf https://astral.sh/uv/install.sh | sh
+      export PATH="$HOME/.local/bin:$PATH"
 
-    # Create and activate Python virtual environment
-    uv venv
-    source .venv/bin/activate
+      # Create Python virtual environment
+      if [ ! -d /home/coder/.venv ]; then
+        cd /home/coder
+        uv venv
+      fi
+      
+      # Auto-activate venv in bashrc
+      if ! grep -q ".venv/bin/activate" ~/.bashrc; then
+        echo 'source /home/coder/.venv/bin/activate' >> ~/.bashrc
+      fi
+      
+      source .venv/bin/activate
 
-    # Install FastAPI and database drivers
-    uv pip install fastapi uvicorn[standard] psycopg2-binary cassandra-driver
+      # Install FastAPI and database drivers
+      uv pip install fastapi uvicorn[standard] psycopg2-binary cassandra-driver
+
+      # Mark setup as complete
+      touch ~/.setup_complete
+      echo "✅ Setup complete!"
+    else
+      echo "♻️  Using existing setup (run 'rm ~/.setup_complete' to reinstall)"
+    fi
+
+    # Auto-cleanup Docker if disk usage is high
+    check_disk_and_cleanup() {
+      if command -v docker &> /dev/null; then
+        DISK_USAGE=$(df /home/coder 2>/dev/null | tail -1 | awk '{print $5}' | sed 's/%//')
+        if [ ! -z "$DISK_USAGE" ] && [ "$DISK_USAGE" -gt 80 ]; then
+          echo "⚠️  Disk usage is high ($${DISK_USAGE}%). Cleaning up Docker..."
+          docker system prune -af --volumes || true
+          echo "✅ Docker cleanup complete"
+        fi
+      fi
+    }
+    check_disk_and_cleanup
 
     # Docker is available via envbox - you can now use docker commands!
-    docker --version
+    if command -v docker &> /dev/null; then
+      docker --version
+    fi
+  EOT
+
+  shutdown_script = <<-EOT
+    #!/bin/bash
+    # Gracefully stop all Docker containers
+    if command -v docker &> /dev/null; then
+      echo "Stopping Docker containers..."
+      docker ps -q | xargs -r docker stop -t 30 || true
+      echo "Docker containers stopped"
+    fi
   EOT
 
   metadata {
@@ -188,6 +244,14 @@ resource "coder_agent" "main" {
     interval     = 60
     timeout      = 1
   }
+
+  metadata {
+    display_name = "Docker Status"
+    key          = "docker_status"
+    script       = "docker info >/dev/null 2>&1 && echo '✓ Healthy' || echo '✗ Unhealthy'"
+    interval     = 30
+    timeout      = 5
+  }
 }
 
 module "jetbrains" {
@@ -196,7 +260,7 @@ module "jetbrains" {
   version  = "1.1.0"
   agent_id = coder_agent.main.id
   folder   = "/home/coder/project"
-  default  = ["PY", "IU"] # Pre-configure GoLand and IntelliJ IDEA
+  default  = ["PY", "IU"] # Pre-configure Pycharm and IntelliJ IDEA
 }
 
 module "vscode-web" {
@@ -261,7 +325,7 @@ resource "kubernetes_pod" "main" {
     container {
       name              = "dev"
       image             = "ghcr.io/coder/envbox:latest"
-      image_pull_policy = "Always"
+      image_pull_policy = "IfNotPresent"
       command           = ["/envbox", "docker"]
 
       security_context {
@@ -337,9 +401,9 @@ resource "kubernetes_pod" "main" {
           "memory" = "${data.coder_parameter.memory.value}Gi"
         }
         limits = {
-          "cpu"    = "${data.coder_parameter.cpu.value}"
-          "memory" = "${data.coder_parameter.memory.value}Gi"
-        }
+          "cpu"    = "${data.coder_parameter.cpu.value * 2}"  # Allow bursting
+          "memory" = "${data.coder_parameter.memory.value * 1.5}Gi"  # Headroom
+}
       }
 
       volume_mount {
@@ -406,7 +470,7 @@ resource "kubernetes_pod" "main" {
       name = "usr-src"
       host_path {
         path = "/usr/src"
-        type = ""
+        type = "Directory"
       }
     }
 
@@ -414,7 +478,7 @@ resource "kubernetes_pod" "main" {
       name = "lib-modules"
       host_path {
         path = "/lib/modules"
-        type = ""
+        type = "Directory"
       }
     }
   }
