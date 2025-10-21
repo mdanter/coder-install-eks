@@ -321,7 +321,9 @@ resource "kubernetes_pod" "main" {
   }
   spec {
     restart_policy = "Never"
-    
+
+    # kubectl describe node | grep Labels -A 10
+    # edit the label key-value pairs to match this template to nodes
     node_selector = {
       "kubernetes.io/os" = "linux"
       "eks.amazonaws.com/nodegroup-image" = "amazon-linux-2"
