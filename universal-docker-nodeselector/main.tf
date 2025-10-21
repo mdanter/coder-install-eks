@@ -197,7 +197,7 @@ resource "coder_agent" "main" {
       if command -v docker &> /dev/null; then
         DISK_USAGE=$(df /home/coder 2>/dev/null | tail -1 | awk '{print $5}' | sed 's/%//')
         if [ ! -z "$DISK_USAGE" ] && [ "$DISK_USAGE" -gt 80 ]; then
-          echo "⚠️  Disk usage is high (${DISK_USAGE}%). Cleaning up Docker..."
+          echo "⚠️  Disk usage is high ($${DISK_USAGE}%). Cleaning up Docker..."
           docker system prune -af --volumes || true
           echo "✅ Docker cleanup complete"
         fi
