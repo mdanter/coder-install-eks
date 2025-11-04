@@ -58,11 +58,6 @@ ext install coder.coder-remote
   - Sign in to your Coder deployment
   - Select workspace and `/home/coder/project` directory
 
-**Alternative: JetBrains Gateway**
-- Standalone lightweight client for remote development
-- Download from [jetbrains.com/remote-development/gateway](https://www.jetbrains.com/remote-development/gateway/)
-- Install Coder plugin and connect to workspace
-
 #### 4. **SSH Access**
 After installing Coder CLI:
 ```bash
