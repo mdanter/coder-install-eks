@@ -2,7 +2,7 @@
 set -eu
 
 # Standalone macOS Coder Installation Script
-# Usage: ./install-coder-mac.sh /path/to/coder_archive.zip
+# Usage: ./install-zip-macos.sh /path/to/coder_archive.zip
 
 main() {
  # Check if zip file path was provided
@@ -52,20 +52,20 @@ main() {
  fi
 
  # Create installation directory
- "$sh_c" mkdir -p "$STANDALONE_INSTALL_PREFIX/bin"
+ $sh_c mkdir -p "$STANDALONE_INSTALL_PREFIX/bin"
 
  # Remove existing binary if present
  if [ -f "$STANDALONE_BINARY_LOCATION" ]; then
   echoh "Removing existing installation..."
-  "$sh_c" rm "$STANDALONE_BINARY_LOCATION"
+  $sh_c rm "$STANDALONE_BINARY_LOCATION"
  fi
 
  # Copy the binary to the installation location
  echoh "Installing binary to $STANDALONE_BINARY_LOCATION"
- "$sh_c" cp "$CACHE_DIR/tmp/coder" "$STANDALONE_BINARY_LOCATION"
+ $sh_c cp "$CACHE_DIR/tmp/coder" "$STANDALONE_BINARY_LOCATION"
 
  # Make it executable
- "$sh_c" chmod +x "$STANDALONE_BINARY_LOCATION"
+ $sh_c chmod +x "$STANDALONE_BINARY_LOCATION"
 
  # Clean up extracted files
  echoh "Cleaning up temporary files..."
