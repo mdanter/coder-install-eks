@@ -336,16 +336,6 @@ resource "coder_agent" "dev" {
   }
 }
 
-module "code-server" {
-  count   = data.coder_workspace.me.start_count
-  source  = "registry.coder.com/modules/code-server/coder"
-  version = "~> 1.0"
-
-  agent_id   = coder_agent.dev[0].id
-  agent_name = "dev"
-  order      = 1
-}
-
 module "jetbrains" {
   count      = data.coder_workspace.me.start_count
   source     = "registry.coder.com/coder/jetbrains/coder"
