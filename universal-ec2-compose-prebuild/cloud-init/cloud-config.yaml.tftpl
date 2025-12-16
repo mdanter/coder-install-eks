@@ -1,0 +1,8 @@
+#cloud-config
+hostname: ${hostname}
+users:
+  - name: ${linux_user}
+    shell: /bin/bash
+    sudo: ALL=(ALL) NOPASSWD:ALL
+    groups: [sudo, docker]
+    lock_passwd: true
