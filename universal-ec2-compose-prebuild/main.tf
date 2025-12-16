@@ -150,7 +150,7 @@ data "coder_parameter" "disk_size" {
   display_name = "Disk Size"
   description  = "The size of the root disk in GB"
   default      = "100"
-  icon         = "/icon/memory.svg"
+  icon         = "/icon/database.svg"
   mutable      = false
   option {
     name  = "50 GB"
@@ -217,7 +217,7 @@ resource "coder_agent" "dev" {
     set -e
 
     # Only run installations once - creates ~/.setup_complete marker
-    if [ ! -f ~/.setup_complete ]; then
+    if [ ! -f "$HOME/.setup_complete" ]; then
       echo "🚀 First-time setup - installing development tools..."
       
       # Install Java (OpenJDK 17)
@@ -228,15 +228,15 @@ resource "coder_agent" "dev" {
 
       # Install Node.js (via nvm for version management)
       if [ ! -d "$HOME/.nvm" ]; then
-        curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.0/install.sh | bash
+        curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.1/install.sh | bash
       fi
       export NVM_DIR="$HOME/.nvm"
       [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
       
       # Add NVM to bashrc if not already there
-      if ! grep -q "NVM_DIR" ~/.bashrc; then
-        echo 'export NVM_DIR="$HOME/.nvm"' >> ~/.bashrc
-        echo '[ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"' >> ~/.bashrc
+      if ! grep -q "NVM_DIR" "$HOME/.bashrc"; then
+        echo 'export NVM_DIR="$HOME/.nvm"' >> "$HOME/.bashrc"
+        echo '[ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"' >> "$HOME/.bashrc"
       fi
       
       nvm install --lts
@@ -246,7 +246,7 @@ resource "coder_agent" "dev" {
       npm install -g pnpm
       
       pnpm setup
-      source /home/coder/.bashrc
+      source "$HOME/.bashrc"
 
       # Install Angular CLI
       pnpm add -g @angular/cli
@@ -256,17 +256,17 @@ resource "coder_agent" "dev" {
       export PATH="$HOME/.local/bin:$PATH"
 
       # Create Python virtual environment
-      if [ ! -d /home/coder/.venv ]; then
-        cd /home/coder
+      if [ ! -d "$HOME/.venv" ]; then
+        cd "$HOME"
         uv venv
       fi
       
       # Auto-activate venv in bashrc
-      if ! grep -q ".venv/bin/activate" ~/.bashrc; then
-        echo 'source /home/coder/.venv/bin/activate' >> ~/.bashrc
+      if ! grep -q ".venv/bin/activate" "$HOME/.bashrc"; then
+        echo 'source "$HOME/.venv/bin/activate"' >> "$HOME/.bashrc"
       fi
       
-      source .venv/bin/activate
+      source "$HOME/.venv/bin/activate"
 
       # Install FastAPI and database drivers
       uv pip install fastapi uvicorn[standard] psycopg2-binary cassandra-driver
@@ -279,11 +279,11 @@ resource "coder_agent" "dev" {
       sudo apt-get install -y docker-ce docker-ce-cli containerd.io docker-compose-plugin docker-buildx-plugin
       sudo usermod -aG docker coder
 
-      # Verify Docker Compose is available
-      docker compose version
+      # Verify Docker Compose is available (use sudo since group not active yet)
+      sudo docker compose version
 
       # Mark setup as complete
-      touch ~/.setup_complete
+      touch "$HOME/.setup_complete"
       echo "✅ Setup complete!"
     else
       echo "♻️  Using existing setup (run 'rm ~/.setup_complete' to reinstall)"
@@ -292,10 +292,10 @@ resource "coder_agent" "dev" {
     # Auto-cleanup Docker if disk usage is high
     check_disk_and_cleanup() {
       if command -v docker &> /dev/null; then
-        DISK_USAGE=$(df /home/coder 2>/dev/null | tail -1 | awk '{print $5}' | sed 's/%//')
+        DISK_USAGE=$(df "$HOME" 2>/dev/null | tail -1 | awk '{print $5}' | sed 's/%//')
         if [ ! -z "$DISK_USAGE" ] && [ "$DISK_USAGE" -gt 80 ]; then
           echo "⚠️  Disk usage is high ($${DISK_USAGE}%). Cleaning up Docker..."
-          docker system prune -af --volumes || true
+          sudo docker system prune -af --volumes || true
           echo "✅ Docker cleanup complete"
         fi
       fi
@@ -304,8 +304,8 @@ resource "coder_agent" "dev" {
 
     # Verify Docker is available
     if command -v docker &> /dev/null; then
-      docker --version
-      docker compose version
+      sudo docker --version
+      sudo docker compose version
     fi
   EOT
 
@@ -314,7 +314,7 @@ resource "coder_agent" "dev" {
     # Gracefully stop all Docker containers
     if command -v docker &> /dev/null; then
       echo "Stopping Docker containers..."
-      docker ps -q | xargs -r docker stop -t 30 || true
+      sudo docker ps -q | xargs -r sudo docker stop -t 30 || true
       echo "Docker containers stopped"
     fi
   EOT
@@ -338,7 +338,7 @@ resource "coder_agent" "dev" {
   metadata {
     display_name = "Disk Usage"
     key          = "disk_usage"
-    script       = "coder stat disk --path /home/coder"
+    script       = "coder stat disk --path $HOME"
     interval     = 60
     timeout      = 1
   }
@@ -346,7 +346,7 @@ resource "coder_agent" "dev" {
   metadata {
     display_name = "Docker Status"
     key          = "docker_status"
-    script       = "docker info >/dev/null 2>&1 && echo '✓ Healthy' || echo '✗ Unhealthy'"
+    script       = "sudo docker info >/dev/null 2>&1 && echo '✓ Healthy' || echo '✗ Unhealthy'"
     interval     = 30
     timeout      = 5
   }
