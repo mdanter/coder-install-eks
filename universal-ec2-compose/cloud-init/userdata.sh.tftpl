@@ -1,9 +1,23 @@
 #!/bin/bash
 set -euo pipefail
 
+# Wait until metadata is accessible.
+# cat <<EOF /tmp/wait.sh
+#     #!/usr/bin/env bash
+#     cloud-init status --wait
+# EOF
+# chmod +x /tmp/wait.sh
+# /tmp/wait.sh &
+
+
 # Create user home directory
 mkdir -p /home/${linux_user}
 chown ${linux_user}:${linux_user} /home/${linux_user}
 
 # Run Coder agent init script
-sudo -u ${linux_user} sh -c '${init_script}'
+sudo -u ${linux_user} CODER_AGENT_TOKEN=${coder_agent_token} sh -c '
+sudo apt update
+sudo apt install -y python3-pip pipx
+pipx install uv
+${init_script}
+'
