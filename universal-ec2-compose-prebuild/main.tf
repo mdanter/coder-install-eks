@@ -191,22 +191,18 @@ data "aws_ami" "ubuntu" {
 }
 
 # Prebuild configuration - keeps workspaces ready for instant claiming
-resource "coder_prebuilt_workspace" "preset" {
-  name             = "prebuild"
-  agents           = [coder_agent.dev[0].id]
-  preset_id        = coder_workspace_preset.default.id
-  instances        = 2
-  expiration_policy {
-    ttl = 86400 # 24 hours - rebuild prebuilt workspaces daily
-  }
-}
-
-resource "coder_workspace_preset" "default" {
+data "coder_workspace_preset" "default" {
   name = "default"
   parameters = {
     region        = "us-east-1"
     instance_type = "m5.2xlarge"
     disk_size     = "100"
+  }
+  prebuilds {
+    instances = 2
+    expiration_policy {
+      ttl = 86400
+    }
   }
 }
 
