@@ -16,7 +16,7 @@ data "coder_parameter" "region" {
   name         = "region"
   display_name = "Region"
   description  = "The region to deploy the workspace in."
-  default      = "us-east-1"
+  default      = "us-east-2"
   mutable      = false
   option {
     name  = "Asia Pacific (Tokyo)"
@@ -193,7 +193,8 @@ data "aws_ami" "ubuntu" {
 resource "coder_agent" "dev" {
   count          = data.coder_workspace.me.start_count
   arch           = "amd64"
-  auth           = "aws-instance-identity"
+  # auth           = "aws-instance-identity"
+  auth          = "token"
   os             = "linux"
 
   startup_script = <<-EOT
@@ -207,6 +208,7 @@ resource "coder_agent" "dev" {
       # Install Java (OpenJDK 17)
       sudo apt-get update
       sudo apt-get install -y openjdk-17-jdk maven gradle
+      
       export JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64
       export PATH="$JAVA_HOME/bin:$PATH"
 
@@ -233,7 +235,7 @@ resource "coder_agent" "dev" {
       source "$HOME/.bashrc"
 
       # Install Angular CLI
-      pnpm add -g @angular/cli
+      pnpm add @angular/cli
 
       # Install uv for Python package management
       curl -LsSf https://astral.sh/uv/install.sh | sh
@@ -390,6 +392,7 @@ data "cloudinit_config" "user_data" {
     content = templatefile("${path.module}/cloud-init/userdata.sh.tftpl", {
       linux_user  = local.linux_user
       init_script = try(coder_agent.dev[0].init_script, "")
+      coder_agent_token = try(coder_agent.dev[0].token, "")
     })
   }
 }
@@ -398,6 +401,7 @@ resource "aws_instance" "dev" {
   ami               = data.aws_ami.ubuntu.id
   availability_zone = "${data.coder_parameter.region.value}a"
   instance_type     = data.coder_parameter.instance_type.value
+  # iam_instance_profile = "SsmManagerConnect_DELETE_LATER"
 
   user_data = data.cloudinit_config.user_data.rendered
 
@@ -435,3 +439,9 @@ resource "aws_ec2_instance_state" "dev" {
   instance_id = aws_instance.dev.id
   state       = data.coder_workspace.me.transition == "start" ? "running" : "stopped"
 }
+
+# data "coder_workspace_tags" "location" {
+#     tags = {
+#         region = "us-east-2"
+#     }
+# }
