@@ -1,9 +1,0 @@
-#!/bin/bash
-set -euo pipefail
-
-# Create user home directory
-mkdir -p /home/${linux_user}
-chown ${linux_user}:${linux_user} /home/${linux_user}
-
-# Run Coder agent init script
-sudo -u ${linux_user} sh -c '${init_script}'
